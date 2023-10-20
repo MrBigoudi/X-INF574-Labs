@@ -50,7 +50,7 @@ void test1(Util &curve_renderer){
     std::cout<<bezier.de_casteljau(V1,0.76358)<<std::endl;
     MatrixXd plot = bezier.plot_curve(V1, resolution);
     curve_renderer.draw_curve(plot);
-    curve_renderer.draw_control_polygon(V1);
+    //curve_renderer.draw_control_polygon(V1);
 }
 
 void test2(Util &curve_renderer, double time_step){
@@ -172,12 +172,12 @@ int main(int argc, char *argv[]){
 
 	
 
-	//test1(curve_renderer);
+	test1(curve_renderer);
 	//test2(curve_renderer, time);
 	//test3(curve_renderer);
-	test4(curve_renderer);
-	// test5(curve_renderer);
-	// test6(curve_renderer);
+	//test4(curve_renderer);
+	//test5(curve_renderer);
+	//test6(curve_renderer);
 
 
 	// //------------------- Uncomment this part for the animation -------------------

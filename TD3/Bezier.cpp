@@ -121,10 +121,29 @@ class Bezier{
 		**/
 		MatrixXd compute_tangent(const MatrixXd &V, double t0){
 			int n = V.rows(); // number of points in the control polygon
-			// To be completed
-
-			return MatrixXd::Zero(1,1);
+			MatrixXd V_prime = MatrixXd::Zero(n-1, 3);
+			for(int i=0; i<n-1; i++){
+				V_prime.row(i) = n*(V.row(i+1)-V.row(i));
+			}
+	
+			MatrixXd tan = de_casteljau(V_prime, t0);
+			return tan.normalized();
 		}
+
+		/**
+		 * Compute the cross product of two MatrixXd
+		 * @param m1 The first matrix
+		 * @param m2 The second matrix
+		 * @return The cross product as a MatrixXd
+		 * @cond m1 and m2 must be 1x3 matrices
+		*/
+		MatrixXd getCross(const MatrixXd& m1, const MatrixXd& m2) const {
+			MatrixXd res(1,3);
+			res << (m1(0,1)*m2(0,2) - m2(0,1)*m1(0,2)),
+				   (m1(0,2)*m2(0,0) - m2(0,2)*m1(0,0)),
+				   (m1(0,0)*m2(0,1) - m2(0,0)*m1(0,1));
+			return res;
+		}	
 
 		/**
 		* Compute the normal vector of a given curve c(t) for a given parameter t0
@@ -137,7 +156,11 @@ class Bezier{
 		MatrixXd compute_normal(const MatrixXd &V, double t0){
 			int n = V.rows(); // number of points in the control polygon
 			// To be completed
-			return MatrixXd::Zero(1,1);
+			MatrixXd tan = compute_tangent(V, t0);
+			MatrixXd tmp(1,3);
+			tmp << 0, 0, 1;
+			tmp = getCross(tan, tmp);
+			return tmp.normalized();
 		}
 
 		/**
@@ -152,7 +175,26 @@ class Bezier{
 		MatrixXd compute_loop_of_vertices(const MatrixXd &V, double t0, int k, double radius){
 			int n = V.rows(); // number of points in the control polygon
 			// To be completed
+			MatrixXd tan = compute_tangent(V, t0);
+			MatrixXd ct = de_casteljau(V, t0);
+			MatrixXd norm = compute_normal(V, t0);
+			MatrixXd cross = getCross(tan, norm);
 
-			return MatrixXd::Zero(1,1);
+			function<Vector3d(float theta)> circle = [=](float theta){
+				float xTmp = ct(0,0) + radius * (cos(theta) * cross(0,0) + sin(theta) * norm(0,0));
+				float yTmp = ct(0,1) + radius * (cos(theta) * cross(0,1) + sin(theta) * norm(0,1));
+				float zTmp = ct(0,2) + radius * (cos(theta) * cross(0,2) + sin(theta) * norm(0,2));
+				return Vector3d(xTmp, yTmp, zTmp);
+			};
+
+			const float PI = 3.1416;
+			float dt = 2*PI / k;
+
+			MatrixXd res = MatrixXd::Zero(k,3);
+			for(int i=0; i<k; i++){
+				res.row(i) = circle(i*dt);
+			}
+
+			return res;
 		}
 };
