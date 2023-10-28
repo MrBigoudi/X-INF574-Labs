@@ -280,6 +280,8 @@ namespace mesh_methods{
 	**/
 	int countBoundaries(HalfedgeDS he){
 		// TO BE COMPLETED
+		std::cout << "he = " << he.sizeOfHalfedges() << ", nbFaces = " << F.rows() << std::endl;
+		if(he.sizeOfHalfedges() == 3*F.rows()) return 0;
 
 		int nbConnectedComponents = 0;
 		MatrixXi visited = MatrixXi::Zero(V.rows(),1);
@@ -363,7 +365,7 @@ namespace mesh_methods{
 
 		for(int v=0; v<V.rows(); v++){
 			voronoi.row(v)[0] /= 8.;
-			std::cout << "Voronoi[" << v << "] = " << voronoi.row(v)[0] << std::endl;
+			//std::cout << "Voronoi[" << v << "] = " << voronoi.row(v)[0] << std::endl;
 		}
 	}
 
@@ -381,6 +383,7 @@ namespace mesh_methods{
 			}
 			// get the gaussian curvature
 			curvatures.row(v)[0] = (2*igl::PI - sum) / voronoi.row(v)[0];
+			//curvatures.row(v)[0] = (2*igl::PI - sum); // libigl doesn't divide by voronoi areas
 		}
 	}
 
@@ -404,11 +407,19 @@ namespace mesh_methods{
 		// rearrange the curvature for every vertex
 		for(int v=0; v<V.rows(); v++){
 			lib_curvatures.row(v)[0] = (2*igl::PI - lib_curvatures.row(v)[0]) / voronoi.row(v)[0];
+			//lib_curvatures.row(v)[0] = (2*igl::PI - lib_curvatures.row(v)[0]); // libigl doesn't divide by voronoi areas
 		}
 	}
 
 	void updateColorGaussianCurvature(MatrixXd &C, double t = 0.0){
 		//TODO 
+		for(int v=0; v<C.rows(); v++){
+			MatrixXd color = MatrixXd(1, 3);
+			float c = (lib_curvatures.row(v)[0] + 2*igl::PI) / (4*igl::PI);
+			std::cout << "c: " << c << std::endl;
+			color << c,0,1-c;
+			C.row(v) = color;
+		}
 	}
 
 }
@@ -490,8 +501,8 @@ int main(int argc, char *argv[]) {
     // igl::readOFF("./data/cat0.off",V,F); // change this line depending on your system
     // igl::readOFF("./data/chandelier.off",V,F); // change this line depending on your system
     // igl::readOFF("./data/cube_open.off",V,F); // change this line depending on your system
-    igl::readOFF("./data/cube_tri.off",V,F); // change this line depending on your system
-    // igl::readOFF("./data/face.off",V,F); // change this line depending on your system
+    // igl::readOFF("./data/cube_tri.off",V,F); // change this line depending on your system
+    igl::readOFF("./data/face.off",V,F); // change this line depending on your system
     // igl::readOFF("./data/high_genus.off",V,F); // change this line depending on your system
     // igl::readOFF("./data/homer.off",V,F); // change this line depending on your system
     // igl::readOFF("./data/nefertiti.off",V,F); // change this line depending on your system
@@ -585,12 +596,14 @@ int main(int argc, char *argv[]) {
 	mesh_methods::compute_lib_gaussian_curvature(); //here use the libigl face based datastructure
 	MatrixXd K = MatrixXd::Zero(V.rows(), 1);
 	igl::gaussian_curvature(V, F, K);
-	for(int v=0; v<V.rows(); v++){
-		std::cout << "he_curv["  << v << "] = " << curvatures.row(v).x() << std::endl; 
-		std::cout << "lib_curv[" << v << "] = " << lib_curvatures.row(v).x() << std::endl; 
-		std::cout << "igl_curv[" << v << "] = " << K.row(v).x() << std::endl; 
-		std::cout << std::endl;
-	}
+	// for(int v=0; v<V.rows(); v++){
+	// 	std::cout << "he_curv["  << v << "] = " << curvatures.row(v).x() << std::endl; 
+	// 	std::cout << "lib_curv[" << v << "] = " << lib_curvatures.row(v).x() << std::endl; 
+	// 	std::cout << "igl_curv[" << v << "] = " << K.row(v).x() << std::endl; 
+	// 	std::cout << std::endl;
+	// }
+	// mesh_methods::updateColorGaussianCurvature(C,0.0f);
+	// viewer.data().set_colors(C);
 	
 
 	/*---------------- Uncomment this part for the build of the Laplacian ----------------*/
