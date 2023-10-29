@@ -260,19 +260,28 @@ namespace mesh_methods{
 	/**
 	 * Do an iteration of the DFS visit
 	 * @param he The half edge structure
-	 * @param v The current vertex
+	 * @param e The current edge
 	 * @param visited The state of all the vertices
 	*/
-	void dfsVisit(HalfedgeDS& he, int v, MatrixXi& visited){
-		visited.row(v)[0] = GREY;
-		std::vector<int> neighbours = getAllVerticesNeighbours(he, v);
-		for(int u : neighbours){
-			if(visited.row(u)[0] == WHITE){
-				dfsVisit(he, u, visited);
-			}
+	void dfsVisit(HalfedgeDS& he, int e, MatrixXi& visited){
+		visited.row(e)[0] = GREY;
+		int neighbour = -1;
+		neighbour = he.getNext(e);
+		if(visited.row(neighbour)[0] == WHITE){
+			dfsVisit(he, neighbour, visited);
 		}
-		visited.row(v)[0] = BLACK;
+		visited.row(e)[0] = BLACK;
 	}
+
+	/**
+	 * Tells if an edge is at a boundary
+	 * @param he The half edge structure
+	 * @param e The edge to check
+	*/
+	bool isAtBoundary(HalfedgeDS he, int e){
+		return (e != he.getNext(he.getNext(he.getNext(e))));
+	}
+	
     	
 	/**
 	* Return the number of boundaries of the mesh
@@ -284,20 +293,45 @@ namespace mesh_methods{
 		if(he.sizeOfHalfedges() == 3*F.rows()) return 0;
 
 		int nbConnectedComponents = 0;
-		MatrixXi visited = MatrixXi::Zero(V.rows(),1);
-		for(int v=0; v<V.rows(); v++){
-			visited.row(v)[0] = WHITE;
+		MatrixXi visited = MatrixXi::Zero(he.sizeOfHalfedges(),1);
+		for(int e=0; e<visited.rows(); e++){
+			visited.row(e)[0] = WHITE;
 		}
 
 		// do a DFS
-		for(int v=0; v<V.rows(); v++){
-			if(visited.row(v)[0] == WHITE){
-				nbConnectedComponents++;
-				dfsVisit(he, v, visited);
+		for(int e=0; e<visited.rows(); e++){
+			if(visited.row(e)[0] == WHITE){
+				// left of the boundary
+				if(isAtBoundary(he, e) && isAtBoundary(he, he.getNext(e))){
+					dfsVisit(he, e, visited);
+					nbConnectedComponents++;
+					continue;
+				}
+				// right of the boundary
+				if(isAtBoundary(he, e) && isAtBoundary(he, he.getPrev(he.getOpposite(e)))){
+					visited.row(e)[0] = BLACK;
+					dfsVisit(he, he.getOpposite(e), visited);
+					nbConnectedComponents++;
+					continue;
+				}
 			}
 		}
 
 		return nbConnectedComponents;
+	}
+
+	void updateColorBoundaries(MatrixXd &C, HalfedgeDS& he){
+		//TODO 
+		for(int e=0; e<he.sizeOfHalfedges(); e++){
+			MatrixXd color = MatrixXd(1, 3);
+			if(isAtBoundary(he, e)){
+				color << 1,0,0;
+			} else {
+				color << 1, 1, 1;
+			}
+			C.row(he.getTarget(e)) = color;
+			C.row(he.getTarget(he.getOpposite(e))) = color;
+		}
 	}
 
 	/**
@@ -416,7 +450,7 @@ namespace mesh_methods{
 		for(int v=0; v<C.rows(); v++){
 			MatrixXd color = MatrixXd(1, 3);
 			float c = (lib_curvatures.row(v)[0] + 2*igl::PI) / (4*igl::PI);
-			std::cout << "c: " << c << std::endl;
+			// std::cout << "c: " << c << std::endl;
 			color << c,0,1-c;
 			C.row(v) = color;
 		}
@@ -426,6 +460,22 @@ namespace mesh_methods{
 
 
 namespace laplacian{
+
+	void printSparseMatrix(const SparseMatrix<double> &mat, const std::string& name) {
+		for (int k = 0; k < mat.outerSize(); ++k) {
+			for (SparseMatrix<double>::InnerIterator it(mat, k); it; ++it) {
+				std::cout << name << "(" << it.row() << "," << it.col() << ") = " << it.value() << std::endl;
+			}
+		}
+	}
+
+	void printMatrixXd(const Eigen::MatrixXd &mat, const std::string& name) {
+		for (int i = 0; i < mat.rows(); ++i) {
+			for (int j = 0; j < mat.cols(); ++j) {
+				std::cout << name << "(" << i << "," << j << ") = " << mat(i, j) << std::endl;
+			}
+		}
+	}
 
 	void buildLaplacian(const MatrixXd &V, const MatrixXi &F, SparseMatrix<double> &L, SparseMatrix<double> &A, SparseMatrix<double> &Ainv, SparseMatrix<double> &Delta){
 
@@ -438,7 +488,50 @@ namespace laplacian{
 		MatrixXd Delta_dense = MatrixXd::Zero(V.rows(),V.rows());
 
 		// TODO -> Fill the matrices
-		
+		for(int i=0; i<V.rows(); i++){
+			A_dense(i,i) = voronoi.row(i)[0];
+			A_inv_dense(i,i) = 1.0/A_dense(i,i);
+		}
+
+		MatrixXd sum = MatrixXd::Zero(V.rows(), 1);
+		for(int f=0; f<F.rows(); f++){
+			int v1Idx = F.row(f)[0];
+			int v2Idx = F.row(f)[1];
+			int v3Idx = F.row(f)[2];
+
+			float alpha_1 = mesh_methods::getTipAngle(v1Idx, v2Idx, v3Idx);
+			float alpha_2 = mesh_methods::getTipAngle(v2Idx, v3Idx, v1Idx);
+			float alpha_3 = mesh_methods::getTipAngle(v3Idx, v1Idx, v2Idx);
+
+			float val3 = (1.0/2.0)*cotangent(alpha_3);
+			float val2 = (1.0/2.0)*cotangent(alpha_2);
+			float val1 = (1.0/2.0)*cotangent(alpha_1);
+
+			L_dense(v1Idx, v2Idx) += val3;
+			Delta_dense(v1Idx, v2Idx) += A_inv_dense(v1Idx,v1Idx) * val3;
+			L_dense(v2Idx, v1Idx) += val3;
+			Delta_dense(v2Idx, v1Idx) += A_inv_dense(v2Idx,v2Idx) * val3;
+			L_dense(v1Idx, v3Idx) += val2;
+			Delta_dense(v1Idx, v3Idx) += A_inv_dense(v1Idx,v1Idx) * val2;
+			L_dense(v3Idx, v1Idx) += val2;
+			Delta_dense(v3Idx, v1Idx) += A_inv_dense(v3Idx,v3Idx) * val2;
+			L_dense(v3Idx, v2Idx) += val1;
+			Delta_dense(v3Idx, v2Idx) += A_inv_dense(v3Idx,v3Idx) * val1;
+			L_dense(v2Idx, v3Idx) += val1;
+			Delta_dense(v2Idx, v3Idx) += A_inv_dense(v2Idx,v2Idx) * val1;
+
+			float lDense1 = - val3 - val2;
+			float lDense2 = - val3 - val1;
+			float lDense3 = - val1 - val2;
+			
+			L_dense(v1Idx,v1Idx) += lDense1;
+			L_dense(v2Idx,v2Idx) += lDense2;
+			L_dense(v3Idx,v3Idx) += lDense3;
+			
+			Delta_dense(v1Idx,v1Idx) += A_inv_dense(v1Idx,v1Idx)*lDense1;
+			Delta_dense(v2Idx,v2Idx) += A_inv_dense(v2Idx,v2Idx)*lDense2;
+			Delta_dense(v3Idx,v3Idx) += A_inv_dense(v3Idx,v3Idx)*lDense3;
+		}
 		
 		// Now convert the matrices to sparse matrices
 
@@ -446,22 +539,104 @@ namespace laplacian{
 		A = A_dense.sparseView();
 		Ainv = A_inv_dense.sparseView();
 		Delta = Delta_dense.sparseView();
+
+		// test
+		// MatrixXd HN = MatrixXd::Zero(V.rows(), V.rows());
+		// SparseMatrix<double> L2,M,Minv;
+		// igl::cotmatrix(V,F,L2);
+		// igl::massmatrix(V,F,igl::MASSMATRIX_TYPE_VORONOI,M);
+		// igl::invert_diag(M,Minv);
+		// HN = Minv*L2;
+
+		// printSparseMatrix(L, "L");
+		// printSparseMatrix(L2, "L2");
+		// std::cout << std::endl;
+		// printSparseMatrix(A, "A");
+		// printSparseMatrix(M, "M");
+		// std::cout << std::endl;
+		// printSparseMatrix(Ainv, "Ainv");
+		// printSparseMatrix(Minv, "Minv");
+		// std::cout << std::endl;
+		// printSparseMatrix(Delta, "Delta");
+		// printMatrixXd(HN, "HN");
 	}
 
 	void setHeat(MatrixXd & u){
 		//TODO
+		float minX = 0.0f;
+		float minY = 0.0f;
+		float maxX = 0.0f;
+		float maxY = 0.0f;
+		float minZ = 0.0f;
+		float maxZ = 0.0f;
+		int argminX = 0;
+		int argminY = 0;
+		int argminZ = 0;
+		int argmaxX = 0;
+		int argmaxY = 0;
+		int argmaxZ = 0;
+
+		float heatValue = 1000.0f;
+
+		for(int v=0; v<V.rows(); v++){
+			float valX = V.row(v).x();
+			float valY = V.row(v).y();
+			float valZ = V.row(v).z();
+
+			if(valX < minX){
+				minX = valX;
+				argminX = v;
+			}
+			if(valX > maxX){
+				maxX = valX;
+				argmaxX = v;
+			}
+			if(valY < minY){
+				minY = valY;
+				argminY = v;
+			}
+			if(valY > maxY){
+				maxY = valY;
+				argmaxY = v;
+			}
+			if(valZ < minZ){
+				minZ = valZ;
+				argminZ = v;
+			}
+			if(valZ > maxZ){
+				maxZ = valZ;
+				argmaxZ = v;
+			}
+		}
+		u.row(argminX)[0] = heatValue;
+		u.row(argminY)[0] = heatValue;
+		u.row(argminZ)[0] = heatValue;
+		u.row(argmaxX)[0] = heatValue;
+		u.row(argmaxY)[0] = heatValue;
+		u.row(argmaxZ)[0] = heatValue;
 	}
 
 	void heat_step_explicit(const SparseMatrix<double> &Delta, MatrixXd & u, double time_step ){
 		//TODO
+		u += time_step*Delta*u;
 	}
 
 	void heat_step_implicit(const SparseMatrix<double> &L,const SparseMatrix<double> &A, MatrixXd & u, double time_step){
 		//TODO 
+		MatrixXd tmp = (A-time_step*L);
+		tmp.inverse();
+		u = tmp*A*u;
 	}
 
 	void updateColorHeat(const MatrixXd & u, MatrixXd &C){
 		//TODO
+		float heatValue = 1000.0f;
+		for(int v=0; v<V.rows(); v++){
+			MatrixXd color = MatrixXd(1, 3);
+			float c = u.row(v)[0];
+			color << c/heatValue,0,0;
+			C.row(v) = color;
+		}
 	}
 
 	void initializeWave(const MatrixXd &V, MatrixXd &u, MatrixXd &u_prev){
@@ -493,7 +668,7 @@ namespace laplacian{
 int main(int argc, char *argv[]) {
 
     // igl::readOFF("./data/bunny_coarser_2.off",V,F); // change this line depending on your system
-    // igl::readOFF("./data/bunny_coarser.off",V,F); // change this line depending on your system
+    igl::readOFF("./data/bunny_coarser.off",V,F); // change this line depending on your system
     // igl::readOFF("./data/bunny_cut.off",V,F); // change this line depending on your system
     // igl::readOFF("./data/bunny_fine.off",V,F); // change this line depending on your system
     // igl::readOFF("./data/bunny_new.off",V,F); // change this line depending on your system
@@ -502,7 +677,7 @@ int main(int argc, char *argv[]) {
     // igl::readOFF("./data/chandelier.off",V,F); // change this line depending on your system
     // igl::readOFF("./data/cube_open.off",V,F); // change this line depending on your system
     // igl::readOFF("./data/cube_tri.off",V,F); // change this line depending on your system
-    igl::readOFF("./data/face.off",V,F); // change this line depending on your system
+    // igl::readOFF("./data/face.off",V,F); // change this line depending on your system
     // igl::readOFF("./data/high_genus.off",V,F); // change this line depending on your system
     // igl::readOFF("./data/homer.off",V,F); // change this line depending on your system
     // igl::readOFF("./data/nefertiti.off",V,F); // change this line depending on your system
@@ -577,6 +752,8 @@ int main(int argc, char *argv[]) {
 	// compute number of boundaries
 	int B=mesh_methods::countBoundaries(he);  
 	std::cout << "The mesh has " << B << " boundaries" << std::endl;
+	// mesh_methods::updateColorBoundaries(C, he);
+	// viewer.data().set_colors(C);
 
 
 
@@ -608,12 +785,12 @@ int main(int argc, char *argv[]) {
 
 	/*---------------- Uncomment this part for the build of the Laplacian ----------------*/
 	// TASK 3
-	// laplacian::buildLaplacian(V,F,L,A,Ainv,Delta);
-	// MatrixXd u = MatrixXd::Zero(V.rows(),1);
-	// MatrixXd u_prev = MatrixXd::Zero(V.rows(),1);
-	// laplacian::setHeat(u);
-	// laplacian::updateColorHeat(u, C);
-	// viewer.data().set_colors(C);
+	laplacian::buildLaplacian(V,F,L,A,Ainv,Delta);
+	MatrixXd u = MatrixXd::Zero(V.rows(),1);
+	MatrixXd u_prev = MatrixXd::Zero(V.rows(),1);
+	laplacian::setHeat(u);
+	laplacian::updateColorHeat(u, C);
+	viewer.data().set_colors(C);
 
 
 	/*---------------- Uncomment this part for the animation ----------------*/
@@ -621,12 +798,14 @@ int main(int argc, char *argv[]) {
 	
 	viewer.core().is_animating = true;  // Enable animation
     double t = 0.0;  // Initialize time
-	double time_step = 0.1; // experiment with this parameter
+	// double time_step = 0.1; // experiment with this parameter
+	double time_step = 0.00005;
+	// double time_step = 1.0;
 
 	// std::this_thread::sleep_for(std::chrono::milliseconds(10000));
     viewer.callback_post_draw = [&](igl::opengl::glfw::Viewer & viewer) -> bool {
 	    // Use a delay to control the speed of the color change
-	    // std::this_thread::sleep_for(std::chrono::milliseconds(5));
+	    std::this_thread::sleep_for(std::chrono::milliseconds(5));
 	    // Calculate new vertex colors based on your time-dependent function
 		
 		//--------- for time dependent coloring ---------
@@ -635,13 +814,13 @@ int main(int argc, char *argv[]) {
 		// viewer.data().set_colors(C);
 		
 		//--------- for the heat flow ---------
-		// laplacian::setHeat(u);	
-		// laplacian::heat_step_explicit(Delta,u,time_step);
+		laplacian::setHeat(u);	
+		laplacian::heat_step_explicit(Delta,u,time_step);
 		// laplacian::heat_step_implicit(L,A,u,time_step);
 
-		// laplacian::updateColorHeat(u,C);
-		// viewer.data(0).set_colors(C);
-		// viewer.data().set_colors(C);
+		laplacian::updateColorHeat(u,C);
+		//viewer.data(0).set_colors(C);
+		viewer.data().set_colors(C);
 
 		//--------- for the wave equation ---------
 		// laplacian::wave_step(Delta,u,u_prev,time_step);
