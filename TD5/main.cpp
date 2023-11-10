@@ -58,24 +58,25 @@ void set_pc(igl::opengl::glfw::Viewer &viewer) {
 }
 
 void ex1() {
-  igl::readOFF("../../data/star.off", V1, F1);
-  igl::readOFF("../../data/star_rotated.off", V2, F2);
+  igl::readOFF("./data/star.off", V1, F1);
+  igl::readOFF("./data/star_rotated.off", V2, F2);
   igl::opengl::glfw::Viewer viewer;
   set_meshes(viewer);
   viewer.launch();
 }
 
 void ex2() {
-  igl::readOFF("../data/bunny.off", V1, F1);
-  igl::readOFF("../data/bunny_rotated.off", V2, F2);
+  igl::readOFF("./data/bunny.off", V1, F1);
+  igl::readOFF("./data/bunny_rotated.off", V2, F2);
   igl::opengl::glfw::Viewer viewer;
   set_meshes(viewer);
     viewer.core().is_animating = true;
     viewer.callback_pre_draw = [&](igl::opengl::glfw::Viewer & )->bool // run animation
     {
-      Eigen::MatrixXd nn_V2(V1.rows(), V1.cols());
+      Eigen::MatrixXd nn_V2 = Eigen::MatrixXd::Zero(V1.rows(), V1.cols());
       nearest_neighbour(V1, V2, nn_V2);
       //  complete here by displaying the pair wise distances
+      std::cout << "Current sum of distances between neighbours: " << getSumPairwiseNN(V1, nn_V2) << std::endl;
       transform(V1,nn_V2);
       viewer.data(0).clear(); // Clear should be called before drawing the mesh
       viewer.data(0).set_mesh(V1, F1);
@@ -119,7 +120,7 @@ void ex4(){
 
 int main(int argc, char *argv[])
 {
-  ex1();
-  // ex2();
+  // ex1();
+  ex2();
   // ex3();
 }

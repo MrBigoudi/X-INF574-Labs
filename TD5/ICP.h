@@ -9,3 +9,4 @@ using namespace Eigen;
 void nearest_neighbour(const MatrixXd &V1, const MatrixXd &V2, MatrixXd &nn_V2);
 void nearest_neighbour_point_to_plane(const MatrixXd &V1, const MatrixXd &V2, MatrixXd &nn_V2);
 void transform(MatrixXd &V1,const MatrixXd &V2);
+float getSumPairwiseNN(const MatrixXd& V1, const MatrixXd& V2);

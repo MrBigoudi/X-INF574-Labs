@@ -9,6 +9,9 @@ include(libigl)
 # Enable the target igl::glfw
 igl_include(glfw)
 
+# create compile command
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # Add your project files
 file(GLOB SRC_FILES *.cpp)
 add_executable(${PROJECT_NAME} ${SRC_FILES})
