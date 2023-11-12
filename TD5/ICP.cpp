@@ -1,33 +1,33 @@
 #include "ICP.h"
+#include "octree.hpp"
 #include <Eigen/src/Core/Matrix.h>
 
-class Octree{
-    private:
-        std::vector<std::vector<int > > _PointIndices;
-        Eigen::MatrixXi _Ch;
-        Eigen::MatrixXd _Cn;
-        Eigen::VectorXd _W;
-        Eigen::MatrixXd _V;
-    public:
-        Octree(const MatrixXd &V){
-            _V = V;
-            igl::octree(V, _PointIndices, _Ch, _Cn, _W);
+void brute_force_nearest_neighbour(const MatrixXd &V1, const MatrixXd &V2, MatrixXd &nn_V2){
+    // return the nearest neighbour to V1 in V2 as nn_V2
+    // Complete here
+    // compute nearest neighbours
+    nn_V2.resize(V1.rows(), V2.cols());
+    for(int i=0; i<V1.rows(); i++){
+        float minDist = -1.0f;
+        for(int j=0; j<V2.rows(); j++){
+            float curDist = (V1.row(i) - V2.row(j)).norm();
+            if(minDist == -1 || curDist < minDist){
+                nn_V2.row(i) = V2.row(j);
+                minDist = curDist;
+            }
         }
-
-        void knn(const MatrixXd &V, size_t k, Eigen::VectorXi &I) const {
-            igl::knn(V, _V, k, _PointIndices, _Ch, _Cn, _W, I);
-        }
-};
+    }
+}
 
 void nearest_neighbour(const MatrixXd &V1, const MatrixXd &V2, MatrixXd &nn_V2){
     // return the nearest neighbour to V1 in V2 as nn_V2
     // Complete here
     // compute nearest neighbours
-    Octree tree(V1);
-    Eigen::VectorXi indices = Eigen::VectorXi::Zero(V2.rows(),1);
-    tree.knn(V2, 1, indices);
-    nn_V2.resize(V2.rows(), V2.cols());
-    for(int i=0; i<V2.rows(); i++){
+    Octree tree(V2);
+    Eigen::MatrixXi indices = Eigen::MatrixXi::Zero(V2.rows(),1);
+    tree.knn(V1, 1, indices);
+    nn_V2.resize(V1.rows(), V2.cols());
+    for(int i=0; i<V1.rows(); i++){
         nn_V2.row(i) = V2.row(indices(i,0));
     }
 }
@@ -43,6 +43,46 @@ float getSumPairwiseNN(const MatrixXd& V1, const MatrixXd& V2){
 void nearest_neighbour_point_to_plane(const MatrixXd &V1, const MatrixXd &V2, MatrixXd &nn_V2){
     // return the nearest neighbour to V1 in V2 as nn_V2 using the point to plane algorithm
     // Complete here
+    nn_V2.resize(V1.rows(), V2.cols());
+
+    // find the three closest point in V1 for each point in V1
+    int k = 3;
+    Octree tree(V1);
+    Eigen::MatrixXi indices = Eigen::MatrixXi::Zero(V1.rows(), k);
+    tree.knn(V1, k, indices);
+
+    // for each point in V1
+    for(int i=0; i<V1.rows(); i++){
+        Eigen::Vector3d curPoint = V1.row(i);
+        Eigen::Vector3d tmp1 = V1.row(indices(i, 1));
+        Eigen::Vector3d tmp2 = V1.row(indices(i, 2));
+        // build the plane
+        Eigen::Vector3d v1 = tmp1 - curPoint;
+        Eigen::Vector3d v2 = tmp2 - curPoint;
+        Eigen::Vector3d normal = v1.cross(v2).normalized();
+        // plane: ax + by + cz + d = 0
+        float a = normal.x();
+        float b = normal.y();
+        float c = normal.z();
+        float d = -normal.dot(curPoint);
+        float deno = a * a + b * b + c * c;
+
+        // for each point in V2, find the one closest to the plane
+        float minDist = -1.0f;
+        for(int j=0; j<V2.rows(); j++){
+            // project the point in v2 on the plane
+            Eigen::Vector3d p = V2.row(j);
+            Eigen::Vector3d q = p - curPoint;
+            float distAlongNorm = q.dot(normal);
+            Eigen::Vector3d projectedPoint = p - distAlongNorm*normal;\
+            // update the min distance and nn_V2
+            float curDist = (curPoint - projectedPoint).norm();
+            if(minDist < 0.0f || curDist < minDist){
+                nn_V2.row(i) = p;
+                minDist = curDist;
+            }
+        }
+    }
 }
 
 

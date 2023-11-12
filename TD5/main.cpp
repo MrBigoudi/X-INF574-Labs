@@ -17,110 +17,131 @@ MatrixXi F2;
 
 
 bool key_down(igl::opengl::glfw::Viewer &viewer, unsigned char key, int modifier) {
-  std::cout << "pressed Key: " << key << " " << (unsigned int)key << std::endl;
+    std::cout << "pressed Key: " << key << " " << (unsigned int)key << std::endl;
 
-  if (key == '1')
-  {
-    transform(V1,V2);
-    viewer.data(0).clear(); // Clear should be called before drawing the mesh
-    viewer.data(0).set_mesh(V1, F1);
-    viewer.data(0).set_colors(Eigen::RowVector3d(0.3, 0.8, 0.3));// update the mesh (both coordinates and faces)
-  }
+    if (key == '1'){
+        transform(V1,V2);
+        viewer.data(0).clear(); // Clear should be called before drawing the mesh
+        viewer.data(0).set_mesh(V1, F1);
+        viewer.data(0).set_colors(Eigen::RowVector3d(0.3, 0.8, 0.3));// update the mesh (both coordinates and faces)
+    }
 
-  return false;
+    return false;
 }
 
 void draw_normals(igl::opengl::glfw::Viewer &viewer, const MatrixXd &V, const MatrixXd &n){
-  MatrixXd current_edge(V.rows(), 3);
-  for (unsigned i = 1; i < V.rows()-1; ++i){
-    current_edge(i,0) =  V(i, 0) + n(i, 0);
-    current_edge(i,1) =  V(i, 1)+ n(i, 1);
-    current_edge(i,2) =  V(i, 2)+ n(i, 2);
-    viewer.data().add_edges(
-        V.row(i),
-        current_edge.row(i),
-        Eigen::RowVector3d(1, 1, 1));
+    MatrixXd current_edge(V.rows(), 3);
+    for (unsigned i = 1; i < V.rows()-1; ++i){
+        current_edge(i,0) =  V(i, 0) + n(i, 0);
+        current_edge(i,1) =  V(i, 1)+ n(i, 1);
+        current_edge(i,2) =  V(i, 2)+ n(i, 2);
+        viewer.data().add_edges(
+            V.row(i),
+            current_edge.row(i),
+            Eigen::RowVector3d(1, 1, 1));
     }
 }
 
 void set_meshes(igl::opengl::glfw::Viewer &viewer) {
-  viewer.callback_key_down = &key_down; // for dealing with keyboard events
-  viewer.data().set_mesh(V1, F1);
-  viewer.append_mesh();
-  viewer.data().set_mesh(V2, F2);
-  viewer.data(0).set_colors(Eigen::RowVector3d(0.3, 0.8, 0.3));
-  viewer.data(1).set_colors(Eigen::RowVector3d(0.8, 0.3, 0.3));
+    viewer.callback_key_down = &key_down; // for dealing with keyboard events
+    viewer.data().set_mesh(V1, F1);
+    viewer.append_mesh();
+    viewer.data().set_mesh(V2, F2);
+    viewer.data(0).set_colors(Eigen::RowVector3d(0.3, 0.8, 0.3));
+    viewer.data(1).set_colors(Eigen::RowVector3d(0.8, 0.3, 0.3));
 }
 
 void set_pc(igl::opengl::glfw::Viewer &viewer) {
-  viewer.callback_key_down = &key_down; // for dealing with keyboard events
-  viewer.data().add_points(V1,Eigen::RowVector3d(0.3, 0.8, 0.3));
+    viewer.callback_key_down = &key_down; // for dealing with keyboard events
+    viewer.data().add_points(V1,Eigen::RowVector3d(0.3, 0.8, 0.3));
 }
 
 void ex1() {
-  igl::readOFF("./data/star.off", V1, F1);
-  igl::readOFF("./data/star_rotated.off", V2, F2);
-  igl::opengl::glfw::Viewer viewer;
-  set_meshes(viewer);
-  viewer.launch();
+    igl::readOFF("./data/star.off", V1, F1);
+    igl::readOFF("./data/star_rotated.off", V2, F2);
+    igl::opengl::glfw::Viewer viewer;
+    set_meshes(viewer);
+    viewer.launch();
 }
 
 void ex2() {
-  igl::readOFF("./data/bunny.off", V1, F1);
-  igl::readOFF("./data/bunny_rotated.off", V2, F2);
-  igl::opengl::glfw::Viewer viewer;
-  set_meshes(viewer);
+    igl::readOFF("./data/bunny.off", V1, F1);
+    igl::readOFF("./data/bunny_rotated.off", V2, F2);
+    igl::opengl::glfw::Viewer viewer;
+    set_meshes(viewer);
     viewer.core().is_animating = true;
     viewer.callback_pre_draw = [&](igl::opengl::glfw::Viewer & )->bool // run animation
     {
-      Eigen::MatrixXd nn_V2 = Eigen::MatrixXd::Zero(V1.rows(), V1.cols());
-      nearest_neighbour(V1, V2, nn_V2);
-      //  complete here by displaying the pair wise distances
-      std::cout << "Current sum of distances between neighbours: " << getSumPairwiseNN(V1, nn_V2) << std::endl;
-      transform(V1,nn_V2);
-      viewer.data(0).clear(); // Clear should be called before drawing the mesh
-      viewer.data(0).set_mesh(V1, F1);
-      viewer.data(0).set_colors(Eigen::RowVector3d(0.3, 0.8, 0.3));// update the mesh (both coordinates and faces)}
-      return false; };
-      viewer.launch(); // run the editor
+        Eigen::MatrixXd nn_V2 = Eigen::MatrixXd::Zero(V1.rows(), V1.cols());
+        
+        auto start = std::chrono::high_resolution_clock::now();
+        brute_force_nearest_neighbour(V1, V2, nn_V2);
+        auto end = std::chrono::high_resolution_clock::now();
+        std::cout << "brute force: time spent = " 
+                  << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() 
+                  << "ms" << std::endl;
+
+        start = std::chrono::high_resolution_clock::now();
+        nearest_neighbour(V1, V2, nn_V2);
+        end = std::chrono::high_resolution_clock::now();
+        std::cout << "octree: time spent = " 
+                  << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() 
+                  << "ms" << std::endl;
+
+        //  complete here by displaying the pair wise distances
+        std::cout << "Current sum of distances between neighbours: " 
+                  << getSumPairwiseNN(V1, nn_V2) 
+                  << std::endl;
+        transform(V1,nn_V2);
+        viewer.data(0).clear(); // Clear should be called before drawing the mesh
+        viewer.data(0).set_mesh(V1, F1);
+        viewer.data(0).set_colors(Eigen::RowVector3d(0.3, 0.8, 0.3));// update the mesh (both coordinates and faces)}
+        return false; 
+    };
+    viewer.launch(); // run the editor
 }
 
 void ex3() {
-  igl::readOFF("../data/bunny.off", V1, F1);
-  igl::readOFF("../data/bunny_rotated.off", V2, F2);
-  igl::opengl::glfw::Viewer viewer;
-  set_meshes(viewer);
+    igl::readOFF("./data/bunny.off", V1, F1);
+    igl::readOFF("./data/bunny_rotated.off", V2, F2);
+    igl::opengl::glfw::Viewer viewer;
+    set_meshes(viewer);
     viewer.core().is_animating = true;
     viewer.callback_pre_draw = [&](igl::opengl::glfw::Viewer & )->bool // run animation
     {
-      Eigen::MatrixXd nn_V2(V1.rows(), V1.cols());
-      nearest_neighbour_point_to_plane(V1, V2, nn_V2);
-      //  complete here by displaying the pair wise distances
-      transform(V1,nn_V2);
-      viewer.data(0).clear(); // Clear should be called before drawing the mesh
-      viewer.data(0).set_mesh(V1, F1);
-      viewer.data(0).set_colors(Eigen::RowVector3d(0.3, 0.8, 0.3));// update the mesh (both coordinates and faces)}
-      return false; };
-      viewer.launch(); // run the editor
+        Eigen::MatrixXd nn_V2(V1.rows(), V1.cols());
+        nearest_neighbour_point_to_plane(V1, V2, nn_V2);
+        //  complete here by displaying the pair wise distances
+        std::cout << "Current sum of distances between neighbours: " 
+                  << getSumPairwiseNN(V1, nn_V2) 
+                  << std::endl;
+        transform(V1,nn_V2);
+        viewer.data(0).clear(); // Clear should be called before drawing the mesh
+        viewer.data(0).set_mesh(V1, F1);
+        viewer.data(0).set_colors(Eigen::RowVector3d(0.3, 0.8, 0.3));// update the mesh (both coordinates and faces)}
+        return false; 
+    };
+    viewer.launch(); // run the editor
 }
 
 void ex4(){
-  igl::readOFF("../data/sphere.off", V1, F1);
-  igl::opengl::glfw::Viewer viewer;
-  set_pc(viewer);
-  Eigen::MatrixXi I;
-  k_nearest_neighbour(V1,I,12);
-  Eigen::MatrixXd normals(V1.rows(), 3);
-  Eigen::MatrixXd A(V1.rows(), 3);
-  Eigen::MatrixXd B(V1.rows(), 3);
-  compute_normals(V1,I, 12, normals);
-  draw_normals(viewer, V1, normals);
-  viewer.launch();
+    igl::readOFF("./data/sphere.off", V1, F1);
+    igl::opengl::glfw::Viewer viewer;
+    set_pc(viewer);
+    Eigen::MatrixXi I;
+    k_nearest_neighbour(V1,I,12);
+    // std::cout << "I: " << I << std::endl;
+    Eigen::MatrixXd normals(V1.rows(), 3);
+    Eigen::MatrixXd A(V1.rows(), 3);
+    Eigen::MatrixXd B(V1.rows(), 3);
+    compute_normals(V1,I, 12, normals);
+    draw_normals(viewer, V1, normals);
+    viewer.launch();
 }
 
-int main(int argc, char *argv[])
-{
-  // ex1();
-  ex2();
-  // ex3();
+int main(int argc, char *argv[]){
+    // ex1();
+    // ex2();
+    ex3();
+    // ex4();
 }
