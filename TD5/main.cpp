@@ -140,8 +140,8 @@ void ex4(){
 }
 
 int main(int argc, char *argv[]){
-    // ex1();
+    ex1();
     // ex2();
-    ex3();
+    // ex3();
     // ex4();
 }
