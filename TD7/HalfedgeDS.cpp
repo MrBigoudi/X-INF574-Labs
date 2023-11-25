@@ -60,6 +60,30 @@ public:
 		faces=new int[nFaces];
 	}
 
+	/**
+	 * Reallocate T
+	 * @param n The new number of vertices
+	 * @param h The new number of half edges
+	 * @param f The new number of faces
+	 * @return A new half edge structure
+	*/
+	HalfedgeDS realloc(int n, int h, int f){
+		HalfedgeDS newHe(n, h, f);
+
+		// copy old arrays
+		for(int i = 0; i < nHalfedges * sizeT; i++){
+			newHe.T[i] = T[i];
+		}
+		for(int i=0; i<nVertices; i++){
+			newHe.incidentEdge[i] = incidentEdge[i];
+		}
+		for(int i=0; i<nFaces; i++){
+			newHe.faces[i] = faces[i];
+		}
+
+		return newHe;
+	}
+
 	/** 
 	 * Set the opposite half-edge 
 	 **/
@@ -111,6 +135,19 @@ public:
 	int setEdgeInFace(int f, int e)
 	{
 		faces[f]=e;
+	}
+
+	void setNewEdge(int v, int& e1, int& e2, int& cpt){
+		if(getEdge(v) != -1){
+			e1 = getEdge(v);
+			e2 = getOpposite(e1);
+		} else {
+			e1 = cpt;
+			e2 = cpt+1;
+			setOpposite(e1, e2);
+			setOpposite(e2, e1);
+			cpt+=2;
+		}
 	}
 
 	//--- methods for accessing data and navigating between mesh elements ---

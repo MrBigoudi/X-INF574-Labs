@@ -38,7 +38,7 @@ public:
 		int n = V_original.rows();		   // number of vertices in the original mesh
 
 		// TO BE COMPLETED (initialize arrays V1 and F1)
-		V1 = new MatrixXd(MatrixXd::Zero(2*V->rows(), V->cols()));
+		V1 = new MatrixXd(MatrixXd::Zero(2*n, V->cols()));
 		F1 = new MatrixXi(MatrixXi::Zero(4*F->rows(), F->cols()));
 	}
 
@@ -54,18 +54,86 @@ public:
 		int f = he->sizeOfFaces();		   // number of faces in the original mesh
 
 		// TO BE COMPLETED
+		// an array containing the index of the midpoint vertex for each half edge
+		int halfEdgeMidPointsIdx[2*e];
+		for(int i=0; i<2*e; i++){
+			halfEdgeMidPointsIdx[i] = -1;
+		}
 		// first step: perform a copy of the original points
+		HalfedgeDS* newHe = new HalfedgeDS(2*n, 2*(3*e), 4*f);
 		for(int i=0; i<n; i++){
 			V1->row(i) = V->row(i);
 		}
 
 		// second step: compute new midpoint vertices and assign a number, between 0..e-1, to all halfedges
-		for(int i=0; i<n; i++){
-			
+		for(int i=0; i<e; i++){
+			if(halfEdgeMidPointsIdx[i] == -1){
+				MatrixXd midPoint = computeEdgePoint(i);
+				int newIdx = n+1;
+				V1->row(newIdx) = midPoint;
+				halfEdgeMidPointsIdx[i] = newIdx;
+				halfEdgeMidPointsIdx[he->getOpposite(i)] = newIdx;
+			}
 		}
 
 
 		// third step: set the face/vertex incidence relations
+		int edgeCounter = 0;
+		for(int i=0; i<f; i++){
+			// get the current face
+			int curFace = i;
+
+			// get the 3 vertices
+			int h01 = he->getEdgeInFace(curFace); // edge from v0 to v1
+			int h12 = he->getNext(h01);
+			int h20 = he->getNext(h12);
+			int v0 = he->getTarget(h20);
+			int v1 = he->getTarget(h01);
+			int v2 = he->getTarget(h12);
+
+			// get the 3 new points
+			int mid01 = halfEdgeMidPointsIdx[h01];
+			int mid12 = halfEdgeMidPointsIdx[h12];
+			int mid20 = halfEdgeMidPointsIdx[h20];
+
+			// get the 9 new edges
+			int h_0_mid01, h_mid01_0 = 0;
+			int h_mid01_1, h_1_mid01 = 0;
+			int h_1_mid12, h_mid12_1 = 0;
+			int h_mid12_2, h_2_mid12 = 0;
+			int h_2_mid20, h_mid20_2 = 0;
+			int h_mid20_0, h_0_mid20 = 0;
+			// pair h_0_mid01, h_mid01_0
+			newHe->setNewEdge(mid01, h_0_mid01, h_mid01_0, edgeCounter);
+			// pair h_1_mid01, h_mid01_1
+			newHe->setNewEdge(v1, h_mid01_1, h_1_mid01, edgeCounter);
+			// pair h_1_mid12, h_mid12_1
+			newHe->setNewEdge(mid12, h_1_mid12, h_mid12_1, edgeCounter);
+			// pair h_2_mid12, h_mid12_2
+			newHe->setNewEdge(v2, h_mid12_2, h_2_mid12, edgeCounter);
+			// pair h_2_mid20, h_mid20_2
+			newHe->setNewEdge(mid20, h_2_mid20, h_mid20_2, edgeCounter);
+			// pair h_0_mid20, h_mid20_0
+			newHe->setNewEdge(v0, h_mid20_0, h_0_mid20, edgeCounter);
+			
+			int h_mid01_mid12 = edgeCounter;
+			int h_mid12_mid01 = edgeCounter+1;
+			newHe->setOpposite(h_mid01_mid12, h_mid12_mid01);
+			newHe->setOpposite(h_mid12_mid01, h_mid01_mid12);
+			int h_mid12_mid20 = edgeCounter+2;
+			int h_mid20_mid12 = edgeCounter+3;
+			newHe->setOpposite(h_mid12_mid20, h_mid20_mid12);
+			newHe->setOpposite(h_mid20_mid12, h_mid12_mid20);
+			int h_mid20_mid01 = edgeCounter+4;
+			int h_mid01_mid20 = edgeCounter+5;
+			newHe->setOpposite(h_mid20_mid01, h_mid01_mid20);
+			newHe->setOpposite(h_mid01_mid20, h_mid20_mid01);
+			edgeCounter+= 6;
+
+
+			// create the relations
+			// set the nexts
+		}
 
 	}
 
