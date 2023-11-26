@@ -57,31 +57,9 @@ public:
 			T[i] = -1; // "-1" means that reference is NOT DEFINED (null)
 
 		incidentEdge = new int[nVertices];
+		for(int i=0; i<n; i++) incidentEdge[i] = -1;
 		faces=new int[nFaces];
-	}
-
-	/**
-	 * Reallocate T
-	 * @param n The new number of vertices
-	 * @param h The new number of half edges
-	 * @param f The new number of faces
-	 * @return A new half edge structure
-	*/
-	HalfedgeDS realloc(int n, int h, int f){
-		HalfedgeDS newHe(n, h, f);
-
-		// copy old arrays
-		for(int i = 0; i < nHalfedges * sizeT; i++){
-			newHe.T[i] = T[i];
-		}
-		for(int i=0; i<nVertices; i++){
-			newHe.incidentEdge[i] = incidentEdge[i];
-		}
-		for(int i=0; i<nFaces; i++){
-			newHe.faces[i] = faces[i];
-		}
-
-		return newHe;
+		for(int i=0; i<f; i++) faces[i] = -1;
 	}
 
 	/** 
@@ -98,6 +76,21 @@ public:
 	void setNext(int e, int eNext)
 	{
 		T[sizeT * e + 1] = eNext;
+	}
+
+	void setRelation(int e1, int e2){
+		setNext(e1, e2);
+		setPrev(e2, e1);
+	}
+
+	void setVertexV2(int e, int v){
+		T[sizeT * e + 2] = v;
+		incidentEdge[v] = e;
+	}
+
+	void setFaceV2(int e, int f){
+		T[sizeT * e + 3] = f;
+		faces[f] = e;
 	}
 
 	/** 
@@ -132,22 +125,40 @@ public:
 	/** 
 	 * Set the half-edge 'e' incident to the given face 'f'
 	 **/
-	int setEdgeInFace(int f, int e)
+	void setEdgeInFace(int f, int e)
 	{
 		faces[f]=e;
 	}
 
-	void setNewEdge(int v, int& e1, int& e2, int& cpt){
-		if(getEdge(v) != -1){
-			e1 = getEdge(v);
+	void setNewEdge(MatrixXi& mat, int v1, int v2, int& e1, int& e2, int& cpt){
+		// std::cout << "v1: " << v1 
+		// 	<< ", v2: " << v2
+		// 	<< ", e1: " << e1 
+		// 	<< ", e2: " << e2 
+		// 	<< ", cpt: " << cpt 
+		// 	<< std::endl;
+
+		e1 = mat(v1,v2);
+		
+		if(e1 != -1){
+			// std::cout << "does exist" << std::endl;
+			// std::cout << "e1: " << e1 << std::endl;
 			e2 = getOpposite(e1);
-		} else {
-			e1 = cpt;
-			e2 = cpt+1;
-			setOpposite(e1, e2);
-			setOpposite(e2, e1);
-			cpt+=2;
+			// std::cout << "e2: " << e2 << std::endl;
+			return;
 		}
+		
+		// std::cout << "does not exist" << std::endl;
+		e1 = cpt;
+		e2 = cpt+1;
+		// std::cout << "e1: " << e1 << std::endl;
+		// std::cout << "e2: " << e2 << std::endl;
+		setOpposite(e1, e2);
+		setOpposite(e2, e1);
+		mat(v1,v2) = e1; 
+		mat(v2,v1) = e2; 
+		cpt+=2;
+		return;
 	}
 
 	//--- methods for accessing data and navigating between mesh elements ---
